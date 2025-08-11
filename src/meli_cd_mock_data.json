@@ -1,0 +1,56 @@
+{
+  "metrics": {
+    "total_produtos": 50,
+    "aguardando_envio": 17,
+    "tempo_medio_permanencia": 161.36,
+    "eficiencia_operacional": 78
+  },
+  "products": [
+    {
+      "id": 1,
+      "nome": "Smartphone Samsung Galaxy A54",
+      "sku": "SAMS-A54-128GB",
+      "categoria": "Eletrônicos",
+      "quantidade": 25,
+      "status": "em_estoque",
+      "tempo_permanencia": 12
+    },
+    {
+      "id": 2,
+      "nome": "Notebook Lenovo IdeaPad 3",
+      "sku": "LEN-IP3-15ITL6",
+      "categoria": "Eletrônicos",
+      "quantidade": 8,
+      "status": "enviado",
+      "tempo_permanencia": 24
+    },
+    {
+      "id": 3,
+      "nome": "Câmera Canon EOS Rebel T7",
+      "sku": "CAN-T7-DSLR",
+      "categoria": "Eletrônicos",
+      "quantidade": 5,
+      "status": "pendente",
+      "tempo_permanencia": 36
+    },
+    {
+      "id": 4,
+      "nome": "Fone de Ouvido JBL Tune 510BT",
+      "sku": "JBL-T510BT-BLK",
+      "categoria": "Eletrônicos",
+      "quantidade": 45,
+      "status": "em_estoque",
+      "tempo_permanencia": 8
+    },
+    {
+      "id": 5,
+      "nome": "Kit Ferramentas Bosch 103 Peças",
+      "sku": "BSH-KIT-103PC",
+      "categoria": "Ferramentas",
+      "quantidade": 12,
+      "status": "em_estoque",
+      "tempo_permanencia": 18
+    }
+  ]
+}
+
