@@ -113,8 +113,8 @@ function App() {
   const filteredProducts = data.products.filter(product => {
     const matchesSearch = product.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.sku.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === '' || product.categoria === selectedCategory;
-    const matchesStatus = selectedStatus === '' || product.status === selectedStatus;
+    const matchesCategory = selectedCategory === '' || product.categoria.toLowerCase() === selectedCategory.toLowerCase();
+    const matchesStatus = selectedStatus === '' || product.status.toLowerCase() === selectedStatus.toLowerCase();
     
     return matchesSearch && matchesCategory && matchesStatus;
   });
@@ -305,6 +305,12 @@ function App() {
 
               {/* Grid de Produtos */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                {filteredProducts.length === 0 && searchTerm !== '' && (
+                  <p className="text-corporate-light text-center col-span-full">Nenhum produto encontrado para "{searchTerm}". Tente ajustar os filtros de busca.</p>
+                )}
+                {filteredProducts.length === 0 && searchTerm === '' && (
+                  <p className="text-corporate-light text-center col-span-full">Nenhum produto encontrado. Tente ajustar os filtros de busca.</p>
+                )}
                 {filteredProducts.map((product, index) => (
                   <div key={product.id} className="corporate-card p-6 animate-fade-in-up" style={{animationDelay: `${index * 0.1}s`}}>
                     <div className="flex items-start space-x-4">

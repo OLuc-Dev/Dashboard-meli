@@ -50,6 +50,96 @@
       "quantidade": 12,
       "status": "em_estoque",
       "tempo_permanencia": 18
+    },
+    {
+      "id": 6,
+      "nome": "Smart TV LG 55 Polegadas",
+      "sku": "LG-TV55-4K",
+      "categoria": "Eletrônicos",
+      "quantidade": 15,
+      "status": "em_estoque",
+      "tempo_permanencia": 10
+    },
+    {
+      "id": 7,
+      "nome": "Máquina de Lavar Brastemp 12kg",
+      "sku": "BRA-LAV-12KG",
+      "categoria": "Eletrodomésticos",
+      "quantidade": 7,
+      "status": "em_estoque",
+      "tempo_permanencia": 20
+    },
+    {
+      "id": 8,
+      "nome": "Geladeira Consul Frost Free",
+      "sku": "CON-GEL-300L",
+      "categoria": "Eletrodomésticos",
+      "quantidade": 10,
+      "status": "enviado",
+      "tempo_permanencia": 15
+    },
+    {
+      "id": 9,
+      "nome": "Panela de Pressão Tramontina",
+      "sku": "TRA-PAN-4.5L",
+      "categoria": "Utensílios Domésticos",
+      "quantidade": 30,
+      "status": "em_estoque",
+      "tempo_permanencia": 5
+    },
+    {
+      "id": 10,
+      "nome": "Jogo de Cama Queen Size",
+      "sku": "JOGO-CAMA-QUEEN",
+      "categoria": "Cama, Mesa e Banho",
+      "quantidade": 20,
+      "status": "pendente",
+      "tempo_permanencia": 28
+    },
+    {
+      "id": 11,
+      "nome": "Batedeira Planetária Britânia",
+      "sku": "BRI-BAT-500W",
+      "categoria": "Eletrodomésticos",
+      "quantidade": 18,
+      "status": "em_estoque",
+      "tempo_permanencia": 9
+    },
+    {
+      "id": 12,
+      "nome": "Furadeira de Impacto Makita",
+      "sku": "MAK-FUR-700W",
+      "categoria": "Ferramentas",
+      "quantidade": 14,
+      "status": "em_estoque",
+      "tempo_permanencia": 11
+    },
+    {
+      "id": 13,
+      "nome": "Aspirador de Pó Philco",
+      "sku": "PHI-ASP-1200W",
+      "categoria": "Eletrodomésticos",
+      "quantidade": 9,
+      "status": "enviado",
+      "tempo_permanencia": 22
+    },
+    {
+      "id": 14,
+      "nome": "Cafeteira Expresso Três Corações",
+      "sku": "TRE-CAF-LOV",
+      "categoria": "Eletrodomésticos",
+      "quantidade": 22,
+      "status": "em_estoque",
+      "tempo_permanencia": 7
+    },
+    {
+      "id": 15,
+      "nome": "Console PlayStation 5",
+      "sku": "SONY-PS5-STD",
+      "categoria": "Games",
+      "quantidade": 3,
+      "status": "pendente",
+      "tempo_permanencia": 30
     }
   ]
 }
