@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Package, Clock, TrendingUp, BarChart3, Users, FileText, GraduationCap, User, AlertCircle } from 'lucide-react';
+import { Search, Filter, Package, Clock, TrendingUp, BarChart3, Users, FileText, GraduationCap, User, AlertCircle, LogOut } from 'lucide-react';
+import { AuthProvider } from './contexts/AuthContext';
+import { useAuth } from './contexts/AuthContext';
+import AuthWrapper from './components/AuthWrapper';
+import PrivateRoute from './components/PrivateRoute';
 import logoImage from './assets/logo.png';
 import './App.css';
 
-function App() {
+function Dashboard() {
+  const { user, logout, authenticatedFetch } = useAuth();
   const [data, setData] = useState({ products: [], metrics: {} });
   const [meliData, setMeliData] = useState({ 
     metrics: {}, 
@@ -20,39 +25,46 @@ function App() {
   const [activeGestorSection, setActiveGestorSection] = useState('selecionar');
 
   useEffect(() => {
-    // Carregar dados do Cross Docking
-    fetch('/api/cd-data')
-      .then(response => response.json())
-      .then(data => {
-        setData(data);
-      })
-      .catch(error => {
-        console.error('Erro ao carregar dados do CD:', error);
-      });
+    const loadData = async () => {
+      try {
+        // Carregar dados do Cross Docking
+        const cdResponse = await authenticatedFetch('/api/cd-data');
+        const cdData = await cdResponse.json();
+        setData(cdData);
 
-    // Carregar dados do Mercado Livre
-    Promise.all([
-      fetch('/api/mercadolivre/metrics').then(res => res.json()),
-      fetch('/api/mercadolivre/products?limit=10').then(res => res.json()),
-      fetch('/api/mercadolivre/orders?limit=10').then(res => res.json()),
-      fetch('/api/mercadolivre/notifications').then(res => res.json()),
-      fetch('/api/mercadolivre/analytics').then(res => res.json())
-    ])
-    .then(([metrics, products, orders, notifications, analytics]) => {
-      setMeliData({
-        metrics,
-        products: products.results || [],
-        orders: orders.results || [],
-        notifications: notifications.notifications || [],
-        analytics
-      });
-      setLoading(false);
-    })
-    .catch(error => {
-      console.error('Erro ao carregar dados do Mercado Livre:', error);
-      setLoading(false);
-    });
-  }, []);
+        // Carregar dados do Mercado Livre
+        const [metricsRes, productsRes, ordersRes, notificationsRes, analyticsRes] = await Promise.all([
+          authenticatedFetch('/api/mercadolivre/metrics'),
+          authenticatedFetch('/api/mercadolivre/products?limit=10'),
+          authenticatedFetch('/api/mercadolivre/orders?limit=10'),
+          authenticatedFetch('/api/mercadolivre/notifications'),
+          authenticatedFetch('/api/mercadolivre/analytics')
+        ]);
+
+        const [metrics, products, orders, notifications, analytics] = await Promise.all([
+          metricsRes.json(),
+          productsRes.json(),
+          ordersRes.json(),
+          notificationsRes.json(),
+          analyticsRes.json()
+        ]);
+
+        setMeliData({
+          metrics,
+          products: products.results || [],
+          orders: orders.results || [],
+          notifications: notifications.notifications || [],
+          analytics
+        });
+        setLoading(false);
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [authenticatedFetch]);
 
   // Dados mockados para gestores
   const gestores = [
@@ -187,6 +199,21 @@ function App() {
               >
                 Mercado Livre
               </button>
+              
+              {/* Informações do usuário e logout */}
+              <div className="flex items-center space-x-4 ml-8 pl-8 border-l border-gray-300">
+                <span className="text-sm text-gray-600">
+                  Olá, <span className="font-medium">{user?.nome}</span>
+                </span>
+                <button
+                  onClick={logout}
+                  className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Sair"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Sair</span>
+                </button>
+              </div>
             </div>
 
             {activeTab === 'dashboard' && (
@@ -758,6 +785,18 @@ function App() {
         </div>
       </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AuthWrapper>
+        <PrivateRoute>
+          <Dashboard />
+        </PrivateRoute>
+      </AuthWrapper>
+    </AuthProvider>
   );
 }
 

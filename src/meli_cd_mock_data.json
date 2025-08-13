@@ -11,135 +11,45 @@
       "nome": "Smartphone Samsung Galaxy A54",
       "sku": "SAMS-A54-128GB",
       "categoria": "Eletrônicos",
-      "quantidade": 25,
       "status": "em_estoque",
-      "tempo_permanencia": 12
+      "quantidade": 25,
+      "tempo_permanencia": 48
     },
     {
       "id": 2,
-      "nome": "Notebook Lenovo IdeaPad 3",
-      "sku": "LEN-IP3-15ITL6",
-      "categoria": "Eletrônicos",
-      "quantidade": 8,
+      "nome": "Notebook Dell Inspiron 15",
+      "sku": "DELL-INS15-512GB",
+      "categoria": "Informática",
       "status": "enviado",
-      "tempo_permanencia": 24
+      "quantidade": 8,
+      "tempo_permanencia": 72
     },
     {
       "id": 3,
       "nome": "Câmera Canon EOS Rebel T7",
-      "sku": "CAN-T7-DSLR",
-      "categoria": "Eletrônicos",
-      "quantidade": 5,
+      "sku": "CANON-T7-KIT",
+      "categoria": "Fotografia",
       "status": "pendente",
-      "tempo_permanencia": 36
+      "quantidade": 12,
+      "tempo_permanencia": 96
     },
     {
       "id": 4,
-      "nome": "Fone de Ouvido JBL Tune 510BT",
-      "sku": "JBL-T510BT-BLK",
-      "categoria": "Eletrônicos",
-      "quantidade": 45,
+      "nome": "Fone de Ouvido Sony WH-1000XM4",
+      "sku": "SONY-WH1000XM4",
+      "categoria": "Áudio",
       "status": "em_estoque",
-      "tempo_permanencia": 8
+      "quantidade": 30,
+      "tempo_permanencia": 24
     },
     {
       "id": 5,
-      "nome": "Kit Ferramentas Bosch 103 Peças",
-      "sku": "BSH-KIT-103PC",
+      "nome": "Kit Ferramentas Bosch 108 Peças",
+      "sku": "BOSCH-KIT108",
       "categoria": "Ferramentas",
-      "quantidade": 12,
-      "status": "em_estoque",
-      "tempo_permanencia": 18
-    },
-    {
-      "id": 6,
-      "nome": "Smart TV LG 55 Polegadas",
-      "sku": "LG-TV55-4K",
-      "categoria": "Eletrônicos",
+      "status": "enviado",
       "quantidade": 15,
-      "status": "em_estoque",
-      "tempo_permanencia": 10
-    },
-    {
-      "id": 7,
-      "nome": "Máquina de Lavar Brastemp 12kg",
-      "sku": "BRA-LAV-12KG",
-      "categoria": "Eletrodomésticos",
-      "quantidade": 7,
-      "status": "em_estoque",
-      "tempo_permanencia": 20
-    },
-    {
-      "id": 8,
-      "nome": "Geladeira Consul Frost Free",
-      "sku": "CON-GEL-300L",
-      "categoria": "Eletrodomésticos",
-      "quantidade": 10,
-      "status": "enviado",
-      "tempo_permanencia": 15
-    },
-    {
-      "id": 9,
-      "nome": "Panela de Pressão Tramontina",
-      "sku": "TRA-PAN-4.5L",
-      "categoria": "Utensílios Domésticos",
-      "quantidade": 30,
-      "status": "em_estoque",
-      "tempo_permanencia": 5
-    },
-    {
-      "id": 10,
-      "nome": "Jogo de Cama Queen Size",
-      "sku": "JOGO-CAMA-QUEEN",
-      "categoria": "Cama, Mesa e Banho",
-      "quantidade": 20,
-      "status": "pendente",
-      "tempo_permanencia": 28
-    },
-    {
-      "id": 11,
-      "nome": "Batedeira Planetária Britânia",
-      "sku": "BRI-BAT-500W",
-      "categoria": "Eletrodomésticos",
-      "quantidade": 18,
-      "status": "em_estoque",
-      "tempo_permanencia": 9
-    },
-    {
-      "id": 12,
-      "nome": "Furadeira de Impacto Makita",
-      "sku": "MAK-FUR-700W",
-      "categoria": "Ferramentas",
-      "quantidade": 14,
-      "status": "em_estoque",
-      "tempo_permanencia": 11
-    },
-    {
-      "id": 13,
-      "nome": "Aspirador de Pó Philco",
-      "sku": "PHI-ASP-1200W",
-      "categoria": "Eletrodomésticos",
-      "quantidade": 9,
-      "status": "enviado",
-      "tempo_permanencia": 22
-    },
-    {
-      "id": 14,
-      "nome": "Cafeteira Expresso Três Corações",
-      "sku": "TRE-CAF-LOV",
-      "categoria": "Eletrodomésticos",
-      "quantidade": 22,
-      "status": "em_estoque",
-      "tempo_permanencia": 7
-    },
-    {
-      "id": 15,
-      "nome": "Console PlayStation 5",
-      "sku": "SONY-PS5-STD",
-      "categoria": "Games",
-      "quantidade": 3,
-      "status": "pendente",
-      "tempo_permanencia": 30
+      "tempo_permanencia": 120
     }
   ]
 }

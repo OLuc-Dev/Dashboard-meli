@@ -366,7 +366,7 @@
 }
 
 .tab-button:not(.active) {
-  @apply hover:text-white hover:bg-white hover:bg-opacity-10;
+  @apply hover:text-white hover:bg-white/10;
   border-color: rgba(255, 255, 255, 0.1);
 }
 
