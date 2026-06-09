@@ -1,175 +1,152 @@
-import React, { useState } from 'react';
-import { Eye, EyeOff, Mail, Lock, LogIn } from 'lucide-react';
+import { useState } from 'react';
+import { Eye, EyeOff, Lock, LogIn, Mail, ShieldCheck, Sparkles, Zap } from 'lucide-react';
 import logoImage from '../assets/logo.png';
 
+const initialFormData = {
+  email: '',
+  password: '',
+};
+
 const Login = ({ onLogin, onSwitchToRegister, loading }) => {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
+  const [formData, setFormData] = useState(initialFormData);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    // Limpar erro do campo quando o usuário começar a digitar
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((previous) => ({ ...previous, [name]: value }));
+
     if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+      setErrors((previous) => ({ ...previous, [name]: '' }));
     }
   };
 
   const validateForm = () => {
-    const newErrors = {};
+    const nextErrors = {};
+    const email = formData.email.trim();
 
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email é obrigatório';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email inválido';
+    if (!email) {
+      nextErrors.email = 'Email é obrigatório';
+    } else if (!/^\S+@\S+\.\S+$/.test(email)) {
+      nextErrors.email = 'Informe um email válido';
     }
 
     if (!formData.password) {
-      newErrors.password = 'Senha é obrigatória';
+      nextErrors.password = 'Senha é obrigatória';
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (validateForm()) {
-      onLogin(formData);
+  const handleSubmit = (event) => {
+    event.preventDefault();
+
+    if (!validateForm()) {
+      return;
     }
+
+    onLogin({
+      email: formData.email.trim(),
+      password: formData.password,
+    });
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
-              <img 
-                src={logoImage} 
-                alt="Logo MELI" 
-                className="h-16 w-16"
-              />
+    <div className="auth-shell">
+      <section className="auth-hero" aria-label="Resumo do dashboard">
+        <span className="auth-hero__badge">
+          <ShieldCheck size={18} /> Operação segura
+        </span>
+        <h1>Entre no painel MELI com uma experiência mais rápida e bonita.</h1>
+        <p>
+          Monitore produtos, gestores, chamados e indicadores do Mercado Livre em uma interface redesenhada para uso diário.
+        </p>
+        <div className="auth-feature-list">
+          <span className="auth-feature-item">
+            <Zap size={18} /> Dados protegidos por autenticação JWT
+          </span>
+          <span className="auth-feature-item">
+            <Sparkles size={18} /> Layout responsivo com feedbacks claros
+          </span>
+        </div>
+      </section>
+
+      <section className="auth-panel" aria-label="Formulário de login">
+        <div className="auth-card">
+          <div className="auth-card__header">
+            <div className="auth-logo">
+              <img src={logoImage} alt="Mercado Livre" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Dashboard MELI
-            </h1>
-            <p className="text-gray-600">
-              Faça login para acessar o dashboard
-            </p>
+            <h1>Bem-vindo</h1>
+            <p>Acesse sua conta para abrir o dashboard empresarial.</p>
           </div>
 
-          {/* Formulário */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+          <form className="auth-form" onSubmit={handleSubmit} noValidate>
+            <label className="form-field" htmlFor="email">
+              Email
+              <span className="auth-input-wrap">
+                <Mail className="auth-input-icon" size={18} />
                 <input
-                  type="email"
+                  className="control-input"
                   id="email"
                   name="email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  autoComplete="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-meli-yellow focus:border-transparent transition-colors ${
-                    errors.email ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="seu@email.com"
+                  aria-invalid={Boolean(errors.email)}
                 />
-              </div>
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-              )}
-            </div>
+              </span>
+              {errors.email && <span className="field-error">{errors.email}</span>}
+            </label>
 
-            {/* Senha */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Senha
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <label className="form-field" htmlFor="password">
+              Senha
+              <span className="auth-input-wrap">
+                <Lock className="auth-input-icon" size={18} />
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  className="control-input has-password-toggle"
                   id="password"
                   name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Sua senha"
+                  autoComplete="current-password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-meli-yellow focus:border-transparent transition-colors ${
-                    errors.password ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="Sua senha"
+                  aria-invalid={Boolean(errors.password)}
                 />
                 <button
+                  className="auth-password-toggle"
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  onClick={() => setShowPassword((current) => !current)}
+                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                 >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
-              </div>
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-              )}
-            </div>
+              </span>
+              {errors.password && <span className="field-error">{errors.password}</span>}
+            </label>
 
-            {/* Botão de Login */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-meli-yellow to-yellow-500 text-black font-semibold py-3 px-4 rounded-lg hover:from-yellow-500 hover:to-yellow-600 focus:ring-2 focus:ring-meli-yellow focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-            >
-              {loading ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div>
-              ) : (
-                <>
-                  <LogIn className="h-5 w-5" />
-                  <span>Entrar</span>
-                </>
-              )}
+            <button className="primary-action" type="submit" disabled={loading}>
+              {loading ? <span className="button-spinner" aria-hidden="true" /> : <LogIn size={18} />}
+              {loading ? 'Entrando...' : 'Entrar no painel'}
             </button>
           </form>
 
-          {/* Link para Registro */}
-          <div className="mt-6 text-center">
-            <p className="text-gray-600">
+          <div className="auth-switch">
+            <p>
               Não tem uma conta?{' '}
-              <button
-                onClick={onSwitchToRegister}
-                className="text-meli-blue hover:text-blue-700 font-medium transition-colors"
-              >
+              <button type="button" onClick={onSwitchToRegister}>
                 Criar conta
               </button>
             </p>
           </div>
-
-          {/* Credenciais de teste */}
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <p className="text-xs text-gray-600 text-center">
-              <strong>Conta de teste:</strong><br />
-              Email: admin@meli.com<br />
-              Senha: admin123
-            </p>
-          </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 };
 
 export default Login;
-
