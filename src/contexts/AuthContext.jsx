@@ -1,12 +1,48 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-const AuthContext = createContext();
+const AuthContext = createContext(null);
+const TOKEN_STORAGE_KEY = 'meli_dashboard_token';
+const USER_STORAGE_KEY = 'meli_dashboard_user';
+
+function readStoredSession() {
+  const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+  const storedUser = localStorage.getItem(USER_STORAGE_KEY);
+
+  if (!storedToken || !storedUser) {
+    return { token: null, user: null };
+  }
+
+  try {
+    return { token: storedToken, user: JSON.parse(storedUser) };
+  } catch (error) {
+    console.error('Erro ao recuperar sessão:', error);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(USER_STORAGE_KEY);
+    return { token: null, user: null };
+  }
+}
+
+function persistSession(accessToken, user) {
+  localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+}
+
+async function getErrorMessage(response, fallbackMessage) {
+  try {
+    const payload = await response.json();
+    return payload.error || payload.message || fallbackMessage;
+  } catch {
+    return fallbackMessage;
+  }
+}
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
+
   if (!context) {
     throw new Error('useAuth deve ser usado dentro de um AuthProvider');
   }
+
   return context;
 };
 
@@ -16,144 +52,122 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Verificar token armazenado ao inicializar
   useEffect(() => {
-    const storedToken = localStorage.getItem('meli_dashboard_token');
-    const storedUser = localStorage.getItem('meli_dashboard_user');
-    
-    if (storedToken && storedUser) {
-      try {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error('Erro ao recuperar dados do usuário:', error);
-        localStorage.removeItem('meli_dashboard_token');
-        localStorage.removeItem('meli_dashboard_user');
-      }
-    }
-    
+    const storedSession = readStoredSession();
+    setToken(storedSession.token);
+    setUser(storedSession.user);
     setLoading(false);
   }, []);
 
-  const login = async (credentials) => {
+  const logout = useCallback(() => {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(USER_STORAGE_KEY);
+    setToken(null);
+    setUser(null);
+  }, []);
+
+  const login = useCallback(async (credentials) => {
     setAuthLoading(true);
+
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(credentials),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Erro ao fazer login');
+        throw new Error(await getErrorMessage(response, 'Erro ao fazer login'));
       }
 
-      // Armazenar token e dados do usuário
-      localStorage.setItem('meli_dashboard_token', data.access_token);
-      localStorage.setItem('meli_dashboard_user', JSON.stringify(data.user));
-      
-      setToken(data.access_token);
-      setUser(data.user);
-      
-      return { success: true, message: data.message };
+      const payload = await response.json();
+      persistSession(payload.access_token, payload.user);
+      setToken(payload.access_token);
+      setUser(payload.user);
+
+      return { success: true, message: payload.message || 'Login realizado com sucesso' };
     } catch (error) {
       console.error('Erro no login:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: error.message || 'Não foi possível fazer login' };
     } finally {
       setAuthLoading(false);
     }
-  };
+  }, []);
 
-  const register = async (userData) => {
+  const register = useCallback(async (userData) => {
     setAuthLoading(true);
+
     try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Erro ao criar conta');
+        throw new Error(await getErrorMessage(response, 'Erro ao criar conta'));
       }
 
-      // Armazenar token e dados do usuário
-      localStorage.setItem('meli_dashboard_token', data.access_token);
-      localStorage.setItem('meli_dashboard_user', JSON.stringify(data.user));
-      
-      setToken(data.access_token);
-      setUser(data.user);
-      
-      return { success: true, message: data.message };
+      const payload = await response.json();
+      persistSession(payload.access_token, payload.user);
+      setToken(payload.access_token);
+      setUser(payload.user);
+
+      return { success: true, message: payload.message || 'Conta criada com sucesso' };
     } catch (error) {
       console.error('Erro no registro:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: error.message || 'Não foi possível criar a conta' };
     } finally {
       setAuthLoading(false);
     }
-  };
+  }, []);
 
-  const logout = () => {
-    localStorage.removeItem('meli_dashboard_token');
-    localStorage.removeItem('meli_dashboard_user');
-    setToken(null);
-    setUser(null);
-  };
+  const isAuthenticated = useCallback(() => Boolean(token && user), [token, user]);
 
-  const isAuthenticated = () => {
-    return !!token && !!user;
-  };
+  const authenticatedFetch = useCallback(
+    async (url, options = {}) => {
+      if (!token) {
+        throw new Error('Token não encontrado. Faça login novamente.');
+      }
 
-  // Função para fazer requisições autenticadas
-  const authenticatedFetch = async (url, options = {}) => {
-    if (!token) {
-      throw new Error('Token não encontrado');
-    }
+      const headers = new Headers(options.headers || {});
+      const isFormData = options.body instanceof FormData;
 
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      ...options.headers,
-    };
+      if (!headers.has('Content-Type') && !isFormData) {
+        headers.set('Content-Type', 'application/json');
+      }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
+      headers.set('Authorization', `Bearer ${token}`);
 
-    // Se o token expirou, fazer logout
-    if (response.status === 401) {
-      logout();
-      throw new Error('Sessão expirada. Faça login novamente.');
-    }
+      const response = await fetch(url, {
+        ...options,
+        headers,
+      });
 
-    return response;
-  };
+      if (response.status === 401) {
+        logout();
+        throw new Error('Sessão expirada. Faça login novamente.');
+      }
 
-  const value = {
-    user,
-    token,
-    loading,
-    authLoading,
-    login,
-    register,
-    logout,
-    isAuthenticated,
-    authenticatedFetch,
-  };
-
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
+      return response;
+    },
+    [logout, token],
   );
-};
 
+  const value = useMemo(
+    () => ({
+      user,
+      token,
+      loading,
+      authLoading,
+      login,
+      register,
+      logout,
+      isAuthenticated,
+      authenticatedFetch,
+    }),
+    [authLoading, authenticatedFetch, isAuthenticated, loading, login, logout, register, token, user],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};

@@ -1,241 +1,219 @@
-import React, { useState } from 'react';
-import { Eye, EyeOff, Mail, Lock, User, UserPlus } from 'lucide-react';
+import { useState } from 'react';
+import { Eye, EyeOff, Lock, Mail, ShieldCheck, Sparkles, User, UserPlus, Zap } from 'lucide-react';
 import logoImage from '../assets/logo.png';
 
+const initialFormData = {
+  nome: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
+};
+
 const Register = ({ onRegister, onSwitchToLogin, loading }) => {
-  const [formData, setFormData] = useState({
-    nome: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
-  });
+  const [formData, setFormData] = useState(initialFormData);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    // Limpar erro do campo quando o usuário começar a digitar
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((previous) => ({ ...previous, [name]: value }));
+
     if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+      setErrors((previous) => ({ ...previous, [name]: '' }));
     }
   };
 
   const validateForm = () => {
-    const newErrors = {};
+    const nextErrors = {};
+    const nome = formData.nome.trim();
+    const email = formData.email.trim();
 
-    if (!formData.nome.trim()) {
-      newErrors.nome = 'Nome é obrigatório';
-    } else if (formData.nome.trim().length < 2) {
-      newErrors.nome = 'Nome deve ter pelo menos 2 caracteres';
+    if (!nome) {
+      nextErrors.nome = 'Nome é obrigatório';
+    } else if (nome.length < 2) {
+      nextErrors.nome = 'Nome deve ter pelo menos 2 caracteres';
     }
 
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email é obrigatório';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email inválido';
+    if (!email) {
+      nextErrors.email = 'Email é obrigatório';
+    } else if (!/^\S+@\S+\.\S+$/.test(email)) {
+      nextErrors.email = 'Informe um email válido';
     }
 
     if (!formData.password) {
-      newErrors.password = 'Senha é obrigatória';
+      nextErrors.password = 'Senha é obrigatória';
     } else if (formData.password.length < 8) {
-      newErrors.password = 'Senha deve ter pelo menos 8 caracteres';
-    } else if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(formData.password)) {
-      newErrors.password = 'Senha deve conter pelo menos uma letra e um número';
+      nextErrors.password = 'Senha deve ter pelo menos 8 caracteres';
+    } else if (!/(?=.*[A-Za-z])(?=.*\d)/.test(formData.password)) {
+      nextErrors.password = 'Senha deve conter letras e números';
     }
 
     if (!formData.confirmPassword) {
-      newErrors.confirmPassword = 'Confirmação de senha é obrigatória';
+      nextErrors.confirmPassword = 'Confirme sua senha';
     } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Senhas não coincidem';
+      nextErrors.confirmPassword = 'As senhas não coincidem';
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (validateForm()) {
-      const { confirmPassword, ...registerData } = formData;
-      onRegister(registerData);
+  const handleSubmit = (event) => {
+    event.preventDefault();
+
+    if (!validateForm()) {
+      return;
     }
+
+    onRegister({
+      nome: formData.nome.trim(),
+      email: formData.email.trim(),
+      password: formData.password,
+    });
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
-              <img 
-                src={logoImage} 
-                alt="Logo MELI" 
-                className="h-16 w-16"
-              />
+    <div className="auth-shell">
+      <section className="auth-hero" aria-label="Benefícios do cadastro">
+        <span className="auth-hero__badge">
+          <ShieldCheck size={18} /> Acesso protegido
+        </span>
+        <h1>Crie sua conta e acompanhe a operação de ponta a ponta.</h1>
+        <p>
+          O novo painel concentra indicadores, chamados, gestores e dados do Mercado Livre em um fluxo mais simples e fluido.
+        </p>
+        <div className="auth-feature-list">
+          <span className="auth-feature-item">
+            <Zap size={18} /> Autenticação persistente e segura
+          </span>
+          <span className="auth-feature-item">
+            <Sparkles size={18} /> Validações claras antes do envio
+          </span>
+        </div>
+      </section>
+
+      <section className="auth-panel" aria-label="Formulário de cadastro">
+        <div className="auth-card">
+          <div className="auth-card__header">
+            <div className="auth-logo">
+              <img src={logoImage} alt="Mercado Livre" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Criar Conta
-            </h1>
-            <p className="text-gray-600">
-              Crie sua conta para acessar o dashboard
-            </p>
+            <h1>Criar conta</h1>
+            <p>Preencha os dados para liberar o dashboard empresarial.</p>
           </div>
 
-          {/* Formulário */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Nome */}
-            <div>
-              <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-2">
-                Nome Completo
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+          <form className="auth-form" onSubmit={handleSubmit} noValidate>
+            <label className="form-field" htmlFor="nome">
+              Nome completo
+              <span className="auth-input-wrap">
+                <User className="auth-input-icon" size={18} />
                 <input
-                  type="text"
+                  className="control-input"
                   id="nome"
                   name="nome"
+                  type="text"
+                  placeholder="Seu nome completo"
+                  autoComplete="name"
                   value={formData.nome}
                   onChange={handleChange}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-meli-yellow focus:border-transparent transition-colors ${
-                    errors.nome ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="Seu nome completo"
+                  aria-invalid={Boolean(errors.nome)}
                 />
-              </div>
-              {errors.nome && (
-                <p className="mt-1 text-sm text-red-600">{errors.nome}</p>
-              )}
-            </div>
+              </span>
+              {errors.nome && <span className="field-error">{errors.nome}</span>}
+            </label>
 
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <label className="form-field" htmlFor="email">
+              Email
+              <span className="auth-input-wrap">
+                <Mail className="auth-input-icon" size={18} />
                 <input
-                  type="email"
+                  className="control-input"
                   id="email"
                   name="email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  autoComplete="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-meli-yellow focus:border-transparent transition-colors ${
-                    errors.email ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="seu@email.com"
+                  aria-invalid={Boolean(errors.email)}
                 />
-              </div>
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-              )}
-            </div>
+              </span>
+              {errors.email && <span className="field-error">{errors.email}</span>}
+            </label>
 
-            {/* Senha */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Senha
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <label className="form-field" htmlFor="password">
+              Senha
+              <span className="auth-input-wrap">
+                <Lock className="auth-input-icon" size={18} />
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  className="control-input has-password-toggle"
                   id="password"
                   name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Mínimo 8 caracteres"
+                  autoComplete="new-password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-meli-yellow focus:border-transparent transition-colors ${
-                    errors.password ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="Mínimo 8 caracteres"
+                  aria-invalid={Boolean(errors.password)}
                 />
                 <button
+                  className="auth-password-toggle"
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  onClick={() => setShowPassword((current) => !current)}
+                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                 >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
-              </div>
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-              )}
-            </div>
+              </span>
+              {errors.password && <span className="field-error">{errors.password}</span>}
+            </label>
 
-            {/* Confirmar Senha */}
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                Confirmar Senha
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <label className="form-field" htmlFor="confirmPassword">
+              Confirmar senha
+              <span className="auth-input-wrap">
+                <Lock className="auth-input-icon" size={18} />
                 <input
-                  type={showConfirmPassword ? 'text' : 'password'}
+                  className="control-input has-password-toggle"
                   id="confirmPassword"
                   name="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  placeholder="Repita sua senha"
+                  autoComplete="new-password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-meli-yellow focus:border-transparent transition-colors ${
-                    errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="Confirme sua senha"
+                  aria-invalid={Boolean(errors.confirmPassword)}
                 />
                 <button
+                  className="auth-password-toggle"
                   type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  onClick={() => setShowConfirmPassword((current) => !current)}
+                  aria-label={showConfirmPassword ? 'Ocultar confirmação' : 'Mostrar confirmação'}
                 >
-                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
-              </div>
-              {errors.confirmPassword && (
-                <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
-              )}
-            </div>
+              </span>
+              {errors.confirmPassword && <span className="field-error">{errors.confirmPassword}</span>}
+            </label>
 
-            {/* Botão de Registro */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-meli-yellow to-yellow-500 text-black font-semibold py-3 px-4 rounded-lg hover:from-yellow-500 hover:to-yellow-600 focus:ring-2 focus:ring-meli-yellow focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-            >
-              {loading ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div>
-              ) : (
-                <>
-                  <UserPlus className="h-5 w-5" />
-                  <span>Criar Conta</span>
-                </>
-              )}
+            <button className="primary-action" type="submit" disabled={loading}>
+              {loading ? <span className="button-spinner" aria-hidden="true" /> : <UserPlus size={18} />}
+              {loading ? 'Criando...' : 'Criar conta'}
             </button>
           </form>
 
-          {/* Link para Login */}
-          <div className="mt-6 text-center">
-            <p className="text-gray-600">
-              Já tem uma conta?{' '}
-              <button
-                onClick={onSwitchToLogin}
-                className="text-meli-blue hover:text-blue-700 font-medium transition-colors"
-              >
+          <div className="auth-switch">
+            <p>
+              Já tem conta?{' '}
+              <button type="button" onClick={onSwitchToLogin}>
                 Fazer login
               </button>
             </p>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 };
 
 export default Register;
-

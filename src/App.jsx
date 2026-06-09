@@ -1,789 +1,850 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Filter, Package, Clock, TrendingUp, BarChart3, Users, FileText, GraduationCap, User, AlertCircle, LogOut } from 'lucide-react';
-import { AuthProvider } from './contexts/AuthContext';
-import { useAuth } from './contexts/AuthContext';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  AlertCircle,
+  BarChart3,
+  Bell,
+  CheckCircle2,
+  ChevronRight,
+  ClipboardList,
+  Clock,
+  FileText,
+  Filter,
+  GraduationCap,
+  LogOut,
+  MessageCircle,
+  Package,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  ShoppingBag,
+  Sparkles,
+  TrendingUp,
+  Truck,
+  User,
+  Users,
+  XCircle,
+} from 'lucide-react';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AuthWrapper from './components/AuthWrapper';
 import PrivateRoute from './components/PrivateRoute';
 import logoImage from './assets/logo.png';
 import './App.css';
 
+const FALLBACK_DASHBOARD_DATA = {
+  metrics: {
+    total_produtos: 0,
+    aguardando_envio: 0,
+    tempo_medio_permanencia: 0,
+    eficiencia_operacional: 0,
+  },
+  products: [],
+};
+
+const EMPTY_MELI_DATA = {
+  metrics: {},
+  products: [],
+  orders: [],
+  notifications: [],
+  analytics: {},
+};
+
+const tabs = [
+  { id: 'dashboard', label: 'Operação CD', icon: Package },
+  { id: 'gestores', label: 'Gestores', icon: Users },
+  { id: 'mercadolivre', label: 'Mercado Livre', icon: ShoppingBag },
+];
+
+const gestores = [
+  { id: 1, nome: 'Ana Silva', departamento: 'Logística', email: 'ana.silva@meli.com', telefone: '(11) 99999-1111' },
+  { id: 2, nome: 'Carlos Santos', departamento: 'Operações', email: 'carlos.santos@meli.com', telefone: '(11) 99999-2222' },
+  { id: 3, nome: 'Maria Oliveira', departamento: 'Qualidade', email: 'maria.oliveira@meli.com', telefone: '(11) 99999-3333' },
+  { id: 4, nome: 'João Pereira', departamento: 'Tecnologia', email: 'joao.pereira@meli.com', telefone: '(11) 99999-4444' },
+  { id: 5, nome: 'Fernanda Costa', departamento: 'RH', email: 'fernanda.costa@meli.com', telefone: '(11) 99999-5555' },
+];
+
+const aprendizes = [
+  { id: 1, nome: 'Lucas Aprendiz', gestorId: 1, gestor: 'Ana Silva', status: 'ativo', progresso: 85, tarefas: 12 },
+  { id: 2, nome: 'Beatriz Santos', gestorId: 2, gestor: 'Carlos Santos', status: 'ativo', progresso: 92, tarefas: 15 },
+  { id: 3, nome: 'Pedro Lima', gestorId: 1, gestor: 'Ana Silva', status: 'ativo', progresso: 78, tarefas: 10 },
+  { id: 4, nome: 'Julia Ferreira', gestorId: 3, gestor: 'Maria Oliveira', status: 'inativo', progresso: 65, tarefas: 8 },
+  { id: 5, nome: 'Rafael Souza', gestorId: 4, gestor: 'João Pereira', status: 'ativo', progresso: 88, tarefas: 14 },
+];
+
+const defaultTicketForm = {
+  assunto: '',
+  descricao: '',
+  tipo: '',
+  prioridade: '',
+  gestorId: '',
+};
+
+const statusConfig = {
+  em_estoque: { label: 'Em estoque', className: 'status-em-estoque' },
+  enviado: { label: 'Enviado', className: 'status-enviado' },
+  pendente: { label: 'Pendente', className: 'status-pendente' },
+};
+
+const normalizeText = (value) => String(value ?? '').toLowerCase().trim();
+const clampPercent = (value) => Math.min(100, Math.max(0, Number(value) || 0));
+
+const numberFormatter = new Intl.NumberFormat('pt-BR');
+const currencyFormatter = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+  maximumFractionDigits: 0,
+});
+
+function formatNumber(value) {
+  return numberFormatter.format(Number(value) || 0);
+}
+
+function formatCurrency(value) {
+  return currencyFormatter.format(Number(value) || 0);
+}
+
+function getInitials(name) {
+  return String(name ?? 'Produto')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
+}
+
+async function parseJsonResponse(response, fallback) {
+  const contentType = response.headers.get('content-type') || '';
+  const canParseJson = contentType.includes('application/json');
+
+  if (!response.ok) {
+    let message = `Erro ${response.status}`;
+    if (canParseJson) {
+      const payload = await response.json().catch(() => ({}));
+      message = payload.error || payload.message || message;
+    }
+    throw new Error(message);
+  }
+
+  if (!canParseJson) {
+    return fallback;
+  }
+
+  return response.json();
+}
+
+function Loader({ message = 'Carregando dashboard...' }) {
+  return (
+    <div className="loader-screen">
+      <div className="loader-card">
+        <div className="loader-spinner" />
+        <p>{message}</p>
+      </div>
+    </div>
+  );
+}
+
+function TabButton({ tab, activeTab, onSelect }) {
+  const Icon = tab.icon;
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(tab.id)}
+      className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
+      aria-pressed={activeTab === tab.id}
+    >
+      <Icon size={18} />
+      <span>{tab.label}</span>
+    </button>
+  );
+}
+
+function StatCard({ icon: Icon, label, value, hint, tone = 'blue', progress }) {
+  const hasProgress = typeof progress !== 'undefined';
+
+  return (
+    <article className={`stat-card stat-card--${tone}`}>
+      <div className="stat-card__top">
+        <div className="stat-card__icon">
+          <Icon size={24} />
+        </div>
+        <span className="stat-card__label">{label}</span>
+      </div>
+      <strong className="stat-card__value">{value}</strong>
+      {hint && <span className="stat-card__hint">{hint}</span>}
+      {hasProgress && (
+        <div className="stat-card__progress" aria-label={`${label}: ${clampPercent(progress)}%`}>
+          <span style={{ width: `${clampPercent(progress)}%` }} />
+        </div>
+      )}
+    </article>
+  );
+}
+
+function StatusBadge({ status }) {
+  const config = statusConfig[status] || { label: status || 'Sem status', className: 'status-default' };
+  return <span className={`status-badge ${config.className}`}>{config.label}</span>;
+}
+
+function ProductAvatar({ name }) {
+  return (
+    <div className="product-avatar" aria-hidden="true">
+      <Package size={18} />
+      <span>{getInitials(name)}</span>
+    </div>
+  );
+}
+
+function EmptyState({ icon: Icon, title, description }) {
+  return (
+    <div className="empty-state">
+      <div className="empty-state__icon">
+        <Icon size={24} />
+      </div>
+      <h3>{title}</h3>
+      <p>{description}</p>
+    </div>
+  );
+}
+
+function FeatureCard({ icon: Icon, title, description, variant = 'primary' }) {
+  return (
+    <article className="feature-card">
+      <div className={`feature-card__icon feature-card__icon--${variant}`}>
+        <Icon size={22} />
+      </div>
+      <h3>{title}</h3>
+      <p>{description}</p>
+      <button type="button" className="feature-card__button">
+        Acessar
+        <ChevronRight size={16} />
+      </button>
+    </article>
+  );
+}
+
 function Dashboard() {
   const { user, logout, authenticatedFetch } = useAuth();
-  const [data, setData] = useState({ products: [], metrics: {} });
-  const [meliData, setMeliData] = useState({ 
-    metrics: {}, 
-    products: [], 
-    orders: [], 
-    notifications: [],
-    analytics: {}
-  });
+  const [data, setData] = useState(FALLBACK_DASHBOARD_DATA);
+  const [meliData, setMeliData] = useState(EMPTY_MELI_DATA);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeGestorSection, setActiveGestorSection] = useState('selecionar');
+  const [managerSearch, setManagerSearch] = useState('');
+  const [apprenticeSearch, setApprenticeSearch] = useState('');
+  const [ticketFeedback, setTicketFeedback] = useState(null);
+  const [chamadoForm, setChamadoForm] = useState(defaultTicketForm);
+
+  const loadData = useCallback(
+    async ({ silent = false } = {}) => {
+      const requests = [
+        { key: 'cd', url: '/api/cd-data', fallback: FALLBACK_DASHBOARD_DATA },
+        { key: 'metrics', url: '/api/mercadolivre/metrics', fallback: {} },
+        { key: 'products', url: '/api/mercadolivre/products?limit=10', fallback: { results: [] } },
+        { key: 'orders', url: '/api/mercadolivre/orders?limit=10', fallback: { results: [] } },
+        { key: 'notifications', url: '/api/mercadolivre/notifications', fallback: { notifications: [] } },
+        { key: 'analytics', url: '/api/mercadolivre/analytics', fallback: {} },
+      ];
+
+      if (silent) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError('');
+
+      const results = await Promise.allSettled(
+        requests.map(async (requestConfig) => {
+          const response = await authenticatedFetch(requestConfig.url);
+          return parseJsonResponse(response, requestConfig.fallback);
+        }),
+      );
+
+      const nextData = {};
+      const failures = [];
+
+      results.forEach((result, index) => {
+        const requestConfig = requests[index];
+        if (result.status === 'fulfilled') {
+          nextData[requestConfig.key] = result.value;
+        } else {
+          failures.push(result.reason?.message || requestConfig.url);
+          nextData[requestConfig.key] = requestConfig.fallback;
+        }
+      });
+
+      setData(nextData.cd || FALLBACK_DASHBOARD_DATA);
+      setMeliData({
+        metrics: nextData.metrics || {},
+        products: Array.isArray(nextData.products?.results) ? nextData.products.results : [],
+        orders: Array.isArray(nextData.orders?.results) ? nextData.orders.results : [],
+        notifications: Array.isArray(nextData.notifications?.notifications)
+          ? nextData.notifications.notifications
+          : [],
+        analytics: nextData.analytics || {},
+      });
+
+      if (failures.length) {
+        const uniqueFailures = [...new Set(failures)].slice(0, 2).join(' | ');
+        setError(`Alguns dados não puderam ser sincronizados agora: ${uniqueFailures}`);
+      }
+
+      setLoading(false);
+      setRefreshing(false);
+    },
+    [authenticatedFetch],
+  );
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        // Carregar dados do Cross Docking
-        const cdResponse = await authenticatedFetch('/api/cd-data');
-        const cdData = await cdResponse.json();
-        setData(cdData);
-
-        // Carregar dados do Mercado Livre
-        const [metricsRes, productsRes, ordersRes, notificationsRes, analyticsRes] = await Promise.all([
-          authenticatedFetch('/api/mercadolivre/metrics'),
-          authenticatedFetch('/api/mercadolivre/products?limit=10'),
-          authenticatedFetch('/api/mercadolivre/orders?limit=10'),
-          authenticatedFetch('/api/mercadolivre/notifications'),
-          authenticatedFetch('/api/mercadolivre/analytics')
-        ]);
-
-        const [metrics, products, orders, notifications, analytics] = await Promise.all([
-          metricsRes.json(),
-          productsRes.json(),
-          ordersRes.json(),
-          notificationsRes.json(),
-          analyticsRes.json()
-        ]);
-
-        setMeliData({
-          metrics,
-          products: products.results || [],
-          orders: orders.results || [],
-          notifications: notifications.notifications || [],
-          analytics
-        });
-        setLoading(false);
-      } catch (error) {
-        console.error('Erro ao carregar dados:', error);
-        setLoading(false);
-      }
-    };
-
     loadData();
-  }, [authenticatedFetch]);
+  }, [loadData]);
 
-  // Dados mockados para gestores
-  const gestores = [
-    { id: 1, nome: 'Ana Silva', departamento: 'Logística', email: 'ana.silva@meli.com', telefone: '(11) 99999-1111' },
-    { id: 2, nome: 'Carlos Santos', departamento: 'Operações', email: 'carlos.santos@meli.com', telefone: '(11) 99999-2222' },
-    { id: 3, nome: 'Maria Oliveira', departamento: 'Qualidade', email: 'maria.oliveira@meli.com', telefone: '(11) 99999-3333' },
-    { id: 4, nome: 'João Pereira', departamento: 'Tecnologia', email: 'joao.pereira@meli.com', telefone: '(11) 99999-4444' },
-    { id: 5, nome: 'Fernanda Costa', departamento: 'RH', email: 'fernanda.costa@meli.com', telefone: '(11) 99999-5555' }
-  ];
+  const products = useMemo(() => (Array.isArray(data.products) ? data.products : []), [data.products]);
+  const metrics = data.metrics || FALLBACK_DASHBOARD_DATA.metrics;
 
-  // Dados mockados para aprendizes
-  const aprendizes = [
-    { id: 1, nome: 'Lucas Aprendiz', gestorId: 1, gestor: 'Ana Silva', status: 'ativo', progresso: 85, tarefas: 12 },
-    { id: 2, nome: 'Beatriz Santos', gestorId: 2, gestor: 'Carlos Santos', status: 'ativo', progresso: 92, tarefas: 15 },
-    { id: 3, nome: 'Pedro Lima', gestorId: 1, gestor: 'Ana Silva', status: 'ativo', progresso: 78, tarefas: 10 },
-    { id: 4, nome: 'Julia Ferreira', gestorId: 3, gestor: 'Maria Oliveira', status: 'inativo', progresso: 65, tarefas: 8 },
-    { id: 5, nome: 'Rafael Souza', gestorId: 4, gestor: 'João Pereira', status: 'ativo', progresso: 88, tarefas: 14 }
-  ];
+  const categories = useMemo(
+    () => Array.from(new Set(products.map((product) => product.categoria).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b, 'pt-BR'),
+    ),
+    [products],
+  );
 
-  // Estados para formulário de chamado
-  const [chamadoForm, setChamadoForm] = useState({
-    assunto: '',
-    descricao: '',
-    tipo: '',
-    prioridade: '',
-    gestorId: ''
-  });
+  const filteredProducts = useMemo(() => {
+    const search = normalizeText(searchTerm);
+    return products.filter((product) => {
+      const matchesSearch =
+        !search ||
+        normalizeText(product.nome).includes(search) ||
+        normalizeText(product.sku).includes(search) ||
+        normalizeText(product.categoria).includes(search);
+      const matchesCategory = !selectedCategory || product.categoria === selectedCategory;
+      const matchesStatus = !selectedStatus || product.status === selectedStatus;
+      return matchesSearch && matchesCategory && matchesStatus;
+    });
+  }, [products, searchTerm, selectedCategory, selectedStatus]);
 
-  const getProductImage = (productName) => {
-    const imageMap = {
-      'smartphone': 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=100&h=100&fit=crop',
-      'notebook': 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=100&h=100&fit=crop',
-      'câmera': 'https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=100&h=100&fit=crop',
-      'fone': 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=100&h=100&fit=crop',
-      'kit ferramentas': 'https://images.unsplash.com/photo-1572981779307-38b8cabb2407?w=100&h=100&fit=crop',
-      'serra': 'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=100&h=100&fit=crop',
-      'batedeira': 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=100&h=100&fit=crop',
-      'aspirador': 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=100&h=100&fit=crop',
-      'air fryer': 'https://images.unsplash.com/photo-1585515656643-1eb50b9e71b9?w=100&h=100&fit=crop',
-      'cafeteira': 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=100&h=100&fit=crop',
-      'parafusadeira': 'https://images.unsplash.com/photo-1609205264511-e7e3b7b6e5b5?w=100&h=100&fit=crop',
-      'panela': 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=100&h=100&fit=crop',
-      'forno': 'https://images.unsplash.com/photo-1574269909862-7e1d70bb8078?w=100&h=100&fit=crop',
-      'console': 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?w=100&h=100&fit=crop',
-      'furadeira': 'https://images.unsplash.com/photo-1609205264511-e7e3b7b6e5b5?w=100&h=100&fit=crop',
-      'liquidificador': 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=100&h=100&fit=crop',
-      'geladeira': 'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?w=100&h=100&fit=crop',
-      'máquina': 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=100&h=100&fit=crop'
-    };
-    
-    const productKey = Object.keys(imageMap).find(key => 
-      productName.toLowerCase().includes(key)
-    );
-    
-    return imageMap[productKey] || 'https://via.placeholder.com/100/FFE600/000000?text=PROD';
+  const filteredManagers = useMemo(() => {
+    const search = normalizeText(managerSearch);
+    return gestores.filter((gestor) => {
+      if (!search) return true;
+      return [gestor.nome, gestor.departamento, gestor.email].some((field) => normalizeText(field).includes(search));
+    });
+  }, [managerSearch]);
+
+  const filteredApprentices = useMemo(() => {
+    const search = normalizeText(apprenticeSearch);
+    return aprendizes.filter((aprendiz) => {
+      if (!search) return true;
+      return [aprendiz.nome, aprendiz.gestor, aprendiz.status].some((field) => normalizeText(field).includes(search));
+    });
+  }, [apprenticeSearch]);
+
+  const meliMetrics = meliData.metrics || {};
+  const todayMetrics = meliMetrics.today || {};
+  const analytics = meliData.analytics || {};
+
+  const handleTicketChange = (event) => {
+    const { name, value } = event.target;
+    setChamadoForm((previous) => ({ ...previous, [name]: value }));
   };
 
-  const filteredProducts = data.products.filter(product => {
-    const matchesSearch = product.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.sku.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === '' || product.categoria.toLowerCase() === selectedCategory.toLowerCase();
-    const matchesStatus = selectedStatus === '' || product.status.toLowerCase() === selectedStatus.toLowerCase();
-    
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
+  const handleTicketSubmit = (event) => {
+    event.preventDefault();
 
-  const categories = [...new Set(data.products.map(product => product.categoria))];
-
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      'em_estoque': { label: 'Em Estoque', class: 'status-em-estoque' },
-      'enviado': { label: 'Enviado', class: 'status-enviado' },
-      'pendente': { label: 'Pendente', class: 'status-pendente' }
-    };
-    
-    const config = statusConfig[status] || { label: status, class: 'bg-gray-100 text-gray-800' };
-    
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${config.class}`}>
-        {config.label}
-      </span>
+    const missingRequiredFields = ['assunto', 'descricao', 'tipo', 'prioridade', 'gestorId'].some(
+      (field) => !String(chamadoForm[field]).trim(),
     );
+
+    if (missingRequiredFields) {
+      setTicketFeedback({ type: 'error', message: 'Preencha todos os campos para enviar o chamado.' });
+      return;
+    }
+
+    setTicketFeedback({ type: 'success', message: 'Chamado preparado com sucesso. O gestor receberá a solicitação.' });
+    setChamadoForm(defaultTicketForm);
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-meli-blue mx-auto"></div>
-          <p className="mt-4 text-xl text-gray-600">Carregando dashboard...</p>
-        </div>
-      </div>
-    );
+    return <Loader />;
   }
 
   return (
-    <div className="bg-corporate-main">
-      {/* Header */}
-      <header className="header-enhanced border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 flex items-center space-x-4">
-                <img 
-                  src={logoImage} 
-                  alt="Logo" 
-                  className="h-10 w-10 icon-enhanced"
-                />
-                <h1 className="text-3xl font-bold heading-corporate">
-                  Mercado Livre - Dashboard Empresarial
-                </h1>
-              </div>
+    <div className="dashboard-shell">
+      <header className="app-header">
+        <div className="app-header__inner">
+          <div className="brand-lockup">
+            <div className="brand-logo-wrap">
+              <img src={logoImage} alt="Mercado Livre" className="brand-logo" />
             </div>
-            
-            {/* Navegação por abas */}
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setActiveTab("dashboard")}
-                className={`tab-button ${activeTab === "dashboard" ? "active" : ""}`}
-              >
-                Dashboard
-              </button>
-              <button
-                onClick={() => setActiveTab("gestores")}
-                className={`tab-button ${activeTab === "gestores" ? "active" : ""}`}
-              >
-                Gestores
-              </button>
-              <button
-                onClick={() => setActiveTab("mercadolivre")}
-                className={`tab-button ${activeTab === "mercadolivre" ? "active" : ""}`}
-              >
-                Mercado Livre
-              </button>
-              
-              {/* Informações do usuário e logout */}
-              <div className="flex items-center space-x-4 ml-8 pl-8 border-l border-gray-300">
-                <span className="text-sm text-gray-600">
-                  Olá, <span className="font-medium">{user?.nome}</span>
-                </span>
-                <button
-                  onClick={logout}
-                  className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Sair"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span>Sair</span>
-                </button>
-              </div>
+            <div className="brand-copy">
+              <span className="eyebrow">Operação MELI</span>
+              <h1>Dashboard Empresarial</h1>
             </div>
+          </div>
 
-            {activeTab === 'dashboard' && (
-              <div className="flex items-center space-x-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                  <input
-                    type="text"
-                    placeholder="Buscar por produto ou SKU..."
-                    className="input-corporate pl-10 pr-4 py-3 w-80"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
+          <nav className="tab-nav" aria-label="Navegação principal">
+            {tabs.map((tab) => (
+              <TabButton key={tab.id} tab={tab} activeTab={activeTab} onSelect={setActiveTab} />
+            ))}
+          </nav>
+
+          <div className="user-menu">
+            <div className="user-chip">
+              <User size={18} />
+              <span>{user?.nome || 'Usuário'}</span>
+            </div>
+            <button type="button" onClick={logout} className="logout-button" title="Sair da conta">
+              <LogOut size={18} />
+              <span>Sair</span>
+            </button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'dashboard' && (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            {/* Dashboard Lateral */}
-            <div className="lg:col-span-1 sidebar-corporate">
-              <div className="space-y-6 p-6">
-                {/* Métricas */}
-                <div className="space-y-4">
-                  <h2 className="text-xl font-bold heading-corporate">Métricas do CD</h2>
-                  
-                  <div className="metric-card-corporate animate-fade-in-scale">
-                    <div className="flex items-center">
-                      <Package className="h-10 w-10 text-meli-blue" />
-                      <div className="ml-4">
-                        <p className="text-sm font-medium subheading-corporate">Total de Produtos</p>
-                        <p className="text-3xl font-bold text-corporate-dark">{data.metrics.total_produtos}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="metric-card-corporate animate-fade-in-scale" style={{animationDelay: '0.1s'}}>
-                    <div className="flex items-center">
-                      <Clock className="h-10 w-10 text-orange-500" />
-                      <div className="ml-4">
-                        <p className="text-sm font-medium subheading-corporate">Aguardando Envio</p>
-                        <p className="text-3xl font-bold text-corporate-dark">{data.metrics.aguardando_envio}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="metric-card-corporate animate-fade-in-scale" style={{animationDelay: '0.2s'}}>
-                    <div className="flex items-center">
-                      <TrendingUp className="h-10 w-10 text-green-500" />
-                      <div className="ml-4">
-                        <p className="text-sm font-medium subheading-corporate">Tempo Médio (h)</p>
-                        <p className="text-3xl font-bold text-corporate-dark">{data.metrics.tempo_medio_permanencia}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="metric-card-corporate animate-fade-in-scale" style={{animationDelay: '0.3s'}}>
-                    <div className="flex items-center">
-                      <BarChart3 className="h-10 w-10 text-meli-blue" />
-                      <div className="ml-4">
-                        <p className="text-sm font-medium subheading-corporate">Eficiência Operacional</p>
-                        <p className="text-3xl font-bold text-corporate-dark">{data.metrics.eficiencia_operacional}%</p>
-                        <div className="progress-bar mt-3">
-                          <div 
-                            className="progress-fill bg-meli-yellow" 
-                            style={{ width: `${data.metrics.eficiencia_operacional}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+      <main className="dashboard-container">
+        <section className="hero-card">
+          <div className="hero-card__content">
+            <span className="eyebrow">Visão em tempo real</span>
+            <h2>Controle sua operação com clareza e velocidade.</h2>
+            <p>
+              Acompanhe produtos no CD, chamados de gestores e indicadores do Mercado Livre em uma experiência mais leve,
+              responsiva e estável.
+            </p>
+            <div className="hero-badges">
+              <span className="soft-badge soft-badge--success">
+                <ShieldCheck size={16} /> Sistema autenticado
+              </span>
+              <span className="soft-badge">
+                <Sparkles size={16} /> Interface refinada
+              </span>
             </div>
+          </div>
+          <div className="hero-card__actions">
+            <button type="button" className="secondary-action" onClick={() => loadData({ silent: true })} disabled={refreshing}>
+              <RefreshCw className={refreshing ? 'spin' : ''} size={18} />
+              {refreshing ? 'Atualizando...' : 'Atualizar dados'}
+            </button>
+          </div>
+        </section>
 
-            {/* Área Principal */}
-            <div className="lg:col-span-3">
-              {/* Filtros */}
-              <div className="corporate-card mb-8 p-6">
-                <div className="flex items-center space-x-4">
-                  <Filter className="h-6 w-6 text-meli-blue icon-enhanced" />
-                  <div className="flex flex-wrap gap-4">
-                    <select
-                      className="input-corporate px-4 py-3"
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                    >
-                      <option value="">Todas as categorias</option>
-                      {categories.map(category => (
-                        <option key={category} value={category}>{category}</option>
-                      ))}
-                    </select>
-
-                    <select
-                      className="input-corporate px-4 py-3"
-                      value={selectedStatus}
-                      onChange={(e) => setSelectedStatus(e.target.value)}
-                    >
-                      <option value="">Todos os status</option>
-                      <option value="em_estoque">Em Estoque</option>
-                      <option value="enviado">Enviado</option>
-                      <option value="pendente">Pendente</option>
-                    </select>
-
-                    <div className="text-sm text-corporate-light flex items-center font-medium">
-                      <Package className="h-4 w-4 mr-2 text-meli-blue" />
-                      {filteredProducts.length} produtos encontrados
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Grid de Produtos */}
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                {filteredProducts.length === 0 && searchTerm !== '' && (
-                  <p className="text-corporate-light text-center col-span-full">Nenhum produto encontrado para "{searchTerm}". Tente ajustar os filtros de busca.</p>
-                )}
-                {filteredProducts.length === 0 && searchTerm === '' && (
-                  <p className="text-corporate-light text-center col-span-full">Nenhum produto encontrado. Tente ajustar os filtros de busca.</p>
-                )}
-                {filteredProducts.map((product, index) => (
-                  <div key={product.id} className="corporate-card p-6 animate-fade-in-up" style={{animationDelay: `${index * 0.1}s`}}>
-                    <div className="flex items-start space-x-4">
-                      <img
-                        src={getProductImage(product.nome)}
-                        alt={product.nome}
-                        className="w-20 h-20 object-cover rounded-xl shadow-md"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-bold text-corporate-dark truncate">{product.nome}</h3>
-                        <p className="text-sm subheading-corporate mt-1 font-medium">SKU: {product.sku}</p>
-                        <div className="mt-3">
-                          {getStatusBadge(product.status)}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-6 space-y-3">
-                      <div className="flex justify-between text-sm">
-                        <span className="subheading-corporate font-medium">Quantidade:</span>
-                        <span className="font-bold text-corporate-dark">{product.quantidade} unidades</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="subheading-corporate font-medium">Categoria:</span>
-                        <span className="font-bold text-meli-blue">{product.categoria}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="subheading-corporate font-medium">Tempo no CD:</span>
-                        <span className="font-bold text-corporate-dark">{product.tempo_permanencia}h</span>
-                      </div>
-                    </div>
-
-                    <button className="btn-corporate-primary w-full mt-6">
-                      Visualizar Mais
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {filteredProducts.length === 0 && (
-                <div className="text-center py-12">
-                  <Package className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum produto encontrado</h3>
-                  <p className="mt-1 text-sm text-gray-500">Tente ajustar os filtros de busca.</p>
-                </div>
-              )}
-            </div>
+        {error && (
+          <div className="feedback-banner feedback-banner--warning" role="alert">
+            <AlertCircle size={20} />
+            <span>{error}</span>
           </div>
         )}
 
-        {activeTab === 'gestores' && (
-          <div className="space-y-8">
-            {/* Sub-navegação da aba Gestores */}
-            <div className="filter-container">
-              <div className="flex items-center space-x-6">
-                <button
-                  onClick={() => setActiveGestorSection("selecionar")}
-                  className={`gestor-section-button ${activeGestorSection === "selecionar" ? "active" : ""}`}
-                >
-                  <Users className="h-5 w-5" />
-                  <span>Selecionar Gestor</span>
-                </button>
-                <button
-                  onClick={() => setActiveGestorSection("chamado")}
-                  className={`gestor-section-button ${activeGestorSection === "chamado" ? "active" : ""}`}
-                >
-                  <FileText className="h-5 w-5" />
-                  <span>Abrir Chamado</span>
-                </button>
-                <button
-                  onClick={() => setActiveGestorSection("aprendizes")}
-                  className={`gestor-section-button ${activeGestorSection === "aprendizes" ? "active" : ""}`}
-                >
-                  <GraduationCap className="h-5 w-5" />
-                  <span>Área de Aprendizes</span>
-                </button>
-              </div>
+        {activeTab === 'dashboard' && (
+          <section className="section-stack" aria-label="Painel do centro de distribuição">
+            <div className="kpi-grid">
+              <StatCard icon={Package} label="Total de produtos" value={formatNumber(metrics.total_produtos || products.length)} hint="Itens monitorados no CD" tone="blue" />
+              <StatCard icon={Truck} label="Aguardando envio" value={formatNumber(metrics.aguardando_envio)} hint="Pedidos em preparação" tone="orange" />
+              <StatCard icon={Clock} label="Tempo médio" value={`${Number(metrics.tempo_medio_permanencia || 0).toFixed(1)}h`} hint="Permanência no CD" tone="purple" />
+              <StatCard icon={TrendingUp} label="Eficiência" value={`${formatNumber(metrics.eficiencia_operacional)}%`} hint="Meta operacional" tone="green" progress={metrics.eficiencia_operacional} />
             </div>
 
-            {/* Seção Selecionar Gestor */}
-            {activeGestorSection === 'selecionar' && (
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">Selecionar Gestor</h2>
-                
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                    <input
-                      type="text"
-                      placeholder="Buscar gestor por nome ou departamento..."
-                      className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-meli-yellow focus:border-transparent w-full"
-                    />
+            <div className="dashboard-grid">
+              <div className="operations-panel">
+                <div className="panel-heading">
+                  <div>
+                    <span className="eyebrow">Cross Docking</span>
+                    <h2>Produtos e filtros</h2>
                   </div>
+                  <span className="filter-count">{filteredProducts.length} encontrados</span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {gestores.map(gestor => (
-                    <div key={gestor.id} className="bg-gray-50 rounded-lg p-6 border hover:shadow-md transition-shadow">
-                      <div className="flex items-center space-x-4 mb-4">
-                        <div className="w-12 h-12 bg-meli-blue rounded-full flex items-center justify-center">
-                          <User className="h-6 w-6 text-white" />
+                <div className="filter-grid">
+                  <label className="input-with-icon">
+                    <Search className="search-icon" size={18} />
+                    <input
+                      type="search"
+                      className="control-input"
+                      placeholder="Buscar produto, SKU ou categoria..."
+                      value={searchTerm}
+                      onChange={(event) => setSearchTerm(event.target.value)}
+                    />
+                  </label>
+
+                  <label className="input-with-icon">
+                    <Filter className="search-icon" size={18} />
+                    <select className="control-input" value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)}>
+                      <option value="">Todas as categorias</option>
+                      {categories.map((category) => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <select className="control-input" value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value)}>
+                    <option value="">Todos os status</option>
+                    <option value="em_estoque">Em estoque</option>
+                    <option value="enviado">Enviado</option>
+                    <option value="pendente">Pendente</option>
+                  </select>
+                </div>
+
+                {filteredProducts.length > 0 ? (
+                  <div className="product-grid">
+                    {filteredProducts.map((product, index) => (
+                      <article key={product.id || product.sku || product.nome || index} className="product-card">
+                        <div className="product-card__header">
+                          <ProductAvatar name={product.nome} />
+                          <div>
+                            <h3 className="product-card__title">{product.nome || 'Produto sem nome'}</h3>
+                            <p className="product-card__meta">SKU: {product.sku || 'N/A'}</p>
+                          </div>
+                        </div>
+
+                        <div className="product-card__body">
+                          <div className="product-row">
+                            <span>Status</span>
+                            <StatusBadge status={product.status} />
+                          </div>
+                          <div className="product-row">
+                            <span>Quantidade</span>
+                            <strong>{formatNumber(product.quantidade)} un.</strong>
+                          </div>
+                          <div className="product-row">
+                            <span>Categoria</span>
+                            <strong>{product.categoria || 'Sem categoria'}</strong>
+                          </div>
+                          <div className="product-row">
+                            <span>Tempo no CD</span>
+                            <strong>{formatNumber(product.tempo_permanencia)}h</strong>
+                          </div>
+                        </div>
+
+                        <button type="button" className="product-card__button">
+                          Ver detalhes
+                          <ChevronRight size={16} />
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon={Package}
+                    title="Nenhum produto encontrado"
+                    description="Ajuste a busca ou os filtros para visualizar outros itens do CD."
+                  />
+                )}
+              </div>
+
+              <aside className="sidebar-panel" aria-label="Resumo operacional">
+                <div className="panel-heading">
+                  <div>
+                    <span className="eyebrow">Resumo</span>
+                    <h2>Saúde da operação</h2>
+                  </div>
+                </div>
+                <div className="mini-metric">
+                  <span className="mini-metric__value">{formatNumber(metrics.eficiencia_operacional)}%</span>
+                  <span className="mini-metric__label">Eficiência operacional</span>
+                  <div className="progress-track">
+                    <span className="progress-fill progress-fill--yellow" style={{ width: `${clampPercent(metrics.eficiencia_operacional)}%` }} />
+                  </div>
+                </div>
+                <div className="mini-metric">
+                  <span className="mini-metric__value">{formatNumber(filteredProducts.length)}</span>
+                  <span className="mini-metric__label">Itens visíveis após filtros</span>
+                </div>
+                <div className="integration-status">
+                  <CheckCircle2 size={18} />
+                  <div>
+                    <strong>Dados protegidos</strong>
+                    <p>Requisições enviadas com token JWT e tratamento de sessão expirada.</p>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </section>
+        )}
+
+        {activeTab === 'gestores' && (
+          <section className="section-stack" aria-label="Gestão de pessoas">
+            <div className="section-nav">
+              <button type="button" onClick={() => setActiveGestorSection('selecionar')} className={`gestor-section-button ${activeGestorSection === 'selecionar' ? 'active' : ''}`}>
+                <Users size={18} />
+                Selecionar gestor
+              </button>
+              <button type="button" onClick={() => setActiveGestorSection('chamado')} className={`gestor-section-button ${activeGestorSection === 'chamado' ? 'active' : ''}`}>
+                <ClipboardList size={18} />
+                Abrir chamado
+              </button>
+              <button type="button" onClick={() => setActiveGestorSection('aprendizes')} className={`gestor-section-button ${activeGestorSection === 'aprendizes' ? 'active' : ''}`}>
+                <GraduationCap size={18} />
+                Aprendizes
+              </button>
+            </div>
+
+            {activeGestorSection === 'selecionar' && (
+              <div className="operations-panel">
+                <div className="panel-heading">
+                  <div>
+                    <span className="eyebrow">Gestores</span>
+                    <h2>Encontre o responsável ideal</h2>
+                  </div>
+                  <span className="filter-count">{filteredManagers.length} gestores</span>
+                </div>
+
+                <label className="input-with-icon">
+                  <Search className="search-icon" size={18} />
+                  <input
+                    type="search"
+                    className="control-input"
+                    placeholder="Buscar por nome, email ou departamento..."
+                    value={managerSearch}
+                    onChange={(event) => setManagerSearch(event.target.value)}
+                  />
+                </label>
+
+                <div className="manager-grid">
+                  {filteredManagers.map((gestor) => (
+                    <article key={gestor.id} className="manager-card">
+                      <div className="product-card__header">
+                        <div className="avatar-circle avatar-circle--blue">
+                          <User size={20} />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-gray-900">{gestor.nome}</h3>
-                          <p className="text-sm text-gray-600">{gestor.departamento}</p>
+                          <h3>{gestor.nome}</h3>
+                          <p>{gestor.departamento}</p>
                         </div>
                       </div>
-                      
-                      <div className="space-y-2 mb-4">
-                        <p className="text-sm text-gray-600">
-                          <span className="font-medium">Email:</span> {gestor.email}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          <span className="font-medium">Telefone:</span> {gestor.telefone}
-                        </p>
+                      <div className="manager-card__meta">
+                        <span>{gestor.email}</span>
+                        <span>{gestor.telefone}</span>
                       </div>
-
-                      <button className="w-full bg-meli-yellow text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-400 transition-colors cursor-pointer">
-                        Selecionar Gestor
+                      <button type="button" className="manager-card__button" onClick={() => setChamadoForm((previous) => ({ ...previous, gestorId: String(gestor.id) }))}>
+                        Vincular ao chamado
                       </button>
-                    </div>
+                    </article>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Seção Abrir Chamado */}
             {activeGestorSection === 'chamado' && (
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">Abrir Chamado</h2>
-                
-                <form className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Assunto do Chamado
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-meli-yellow focus:border-transparent"
-                        placeholder="Digite o assunto..."
-                        value={chamadoForm.assunto}
-                        onChange={(e) => setChamadoForm({...chamadoForm, assunto: e.target.value})}
-                      />
-                    </div>
+              <div className="ticket-card">
+                <div className="panel-heading">
+                  <div>
+                    <span className="eyebrow">Chamados</span>
+                    <h2>Abra uma solicitação</h2>
+                  </div>
+                </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Gestor Responsável
-                      </label>
-                      <select
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-meli-yellow focus:border-transparent"
-                        value={chamadoForm.gestorId}
-                        onChange={(e) => setChamadoForm({...chamadoForm, gestorId: e.target.value})}
-                      >
+                {ticketFeedback && (
+                  <div className={`feedback-banner feedback-banner--${ticketFeedback.type === 'success' ? 'success' : 'warning'}`}>
+                    {ticketFeedback.type === 'success' ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
+                    <span>{ticketFeedback.message}</span>
+                  </div>
+                )}
+
+                <form className="ticket-form" onSubmit={handleTicketSubmit}>
+                  <div className="form-grid">
+                    <label className="form-field">
+                      Assunto
+                      <input name="assunto" className="control-input" placeholder="Ex.: Divergência no pedido" value={chamadoForm.assunto} onChange={handleTicketChange} />
+                    </label>
+                    <label className="form-field">
+                      Gestor responsável
+                      <select name="gestorId" className="control-input" value={chamadoForm.gestorId} onChange={handleTicketChange}>
                         <option value="">Selecione um gestor...</option>
-                        {gestores.map(gestor => (
-                          <option key={gestor.id} value={gestor.id}>
-                            {gestor.nome} - {gestor.departamento}
-                          </option>
+                        {gestores.map((gestor) => (
+                          <option key={gestor.id} value={gestor.id}>{gestor.nome} - {gestor.departamento}</option>
                         ))}
                       </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Tipo de Chamado
-                      </label>
-                      <select
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-meli-yellow focus:border-transparent"
-                        value={chamadoForm.tipo}
-                        onChange={(e) => setChamadoForm({...chamadoForm, tipo: e.target.value})}
-                      >
-                        <option value="">Selecione o tipo...</option>
-                        <option value="problema_tecnico">Problema Técnico</option>
+                    </label>
+                    <label className="form-field">
+                      Tipo
+                      <select name="tipo" className="control-input" value={chamadoForm.tipo} onChange={handleTicketChange}>
+                        <option value="">Selecione...</option>
+                        <option value="problema_tecnico">Problema técnico</option>
                         <option value="solicitacao">Solicitação</option>
                         <option value="feedback">Feedback</option>
                         <option value="duvida">Dúvida</option>
                       </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Prioridade
-                      </label>
-                      <select
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-meli-yellow focus:border-transparent"
-                        value={chamadoForm.prioridade}
-                        onChange={(e) => setChamadoForm({...chamadoForm, prioridade: e.target.value})}
-                      >
-                        <option value="">Selecione a prioridade...</option>
+                    </label>
+                    <label className="form-field">
+                      Prioridade
+                      <select name="prioridade" className="control-input" value={chamadoForm.prioridade} onChange={handleTicketChange}>
+                        <option value="">Selecione...</option>
                         <option value="baixa">Baixa</option>
                         <option value="media">Média</option>
                         <option value="alta">Alta</option>
                         <option value="urgente">Urgente</option>
                       </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Descrição Detalhada
                     </label>
-                    <textarea
-                      rows={6}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-meli-yellow focus:border-transparent"
-                      placeholder="Descreva detalhadamente o chamado..."
-                      value={chamadoForm.descricao}
-                      onChange={(e) => setChamadoForm({...chamadoForm, descricao: e.target.value})}
-                    />
                   </div>
 
-                  <div className="flex justify-end space-x-4">
-                    <button
-                      type="button"
-                      className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
-                      onClick={() => setChamadoForm({assunto: '', descricao: '', tipo: '', prioridade: '', gestorId: ''})}
-                    >
+                  <label className="form-field">
+                    Descrição detalhada
+                    <textarea name="descricao" className="control-input" rows={6} placeholder="Descreva o contexto, impacto e próximos passos esperados..." value={chamadoForm.descricao} onChange={handleTicketChange} />
+                  </label>
+
+                  <div className="form-actions">
+                    <button type="button" className="ghost-button" onClick={() => { setChamadoForm(defaultTicketForm); setTicketFeedback(null); }}>
                       Limpar
                     </button>
-                    <button
-                      type="submit"
-                      className="px-6 py-2 bg-meli-yellow text-black rounded-lg font-medium hover:bg-yellow-400 transition-colors cursor-pointer"
-                    >
-                      Enviar Chamado
+                    <button type="submit" className="primary-action">
+                      Enviar chamado
                     </button>
                   </div>
                 </form>
               </div>
             )}
 
-            {/* Seção Área de Aprendizes */}
             {activeGestorSection === 'aprendizes' && (
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">Área de Aprendizes</h2>
-                
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                    <input
-                      type="text"
-                      placeholder="Buscar aprendiz por nome ou gestor..."
-                      className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-meli-yellow focus:border-transparent w-full"
-                    />
+              <div className="operations-panel">
+                <div className="panel-heading">
+                  <div>
+                    <span className="eyebrow">Aprendizes</span>
+                    <h2>Acompanhe evolução e tarefas</h2>
                   </div>
+                  <span className="filter-count">{filteredApprentices.length} pessoas</span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {aprendizes.map(aprendiz => (
-                    <div key={aprendiz.id} className="bg-gray-50 rounded-lg p-6 border hover:shadow-md transition-shadow">
-                      <div className="flex items-center space-x-4 mb-4">
-                        <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
-                          <GraduationCap className="h-6 w-6 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{aprendiz.nome}</h3>
-                          <p className="text-sm text-gray-600">Gestor: {aprendiz.gestor}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-3 mb-4">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Status:</span>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            aprendiz.status === 'ativo' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {aprendiz.status === 'ativo' ? 'Ativo' : 'Inativo'}
-                          </span>
-                        </div>
-                        
-                        <div>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="text-gray-600">Progresso:</span>
-                            <span className="font-medium">{aprendiz.progresso}%</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-meli-yellow h-2 rounded-full transition-all duration-300" 
-                              style={{ width: `${aprendiz.progresso}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Tarefas:</span>
-                          <span className="font-medium">{aprendiz.tarefas} concluídas</span>
-                        </div>
-                      </div>
+                <label className="input-with-icon">
+                  <Search className="search-icon" size={18} />
+                  <input
+                    type="search"
+                    className="control-input"
+                    placeholder="Buscar aprendiz, gestor ou status..."
+                    value={apprenticeSearch}
+                    onChange={(event) => setApprenticeSearch(event.target.value)}
+                  />
+                </label>
 
-                      <button className="w-full bg-meli-yellow text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-400 transition-colors cursor-pointer">
-                        Ver Detalhes
-                      </button>
-                    </div>
+                <div className="manager-grid">
+                  {filteredApprentices.map((aprendiz) => (
+                    <article key={aprendiz.id} className="apprentice-card">
+                      <div className="product-card__header">
+                        <div className="avatar-circle avatar-circle--green">
+                          <GraduationCap size={20} />
+                        </div>
+                        <div>
+                          <h3>{aprendiz.nome}</h3>
+                          <p>Gestor: {aprendiz.gestor}</p>
+                        </div>
+                      </div>
+                      <div className="product-row">
+                        <span>Status</span>
+                        <span className={`status-pill ${aprendiz.status === 'ativo' ? 'status-pill--success' : 'status-pill--danger'}`}>
+                          {aprendiz.status === 'ativo' ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </div>
+                      <div className="apprentice-progress">
+                        <div className="product-row">
+                          <span>Progresso</span>
+                          <strong>{aprendiz.progresso}%</strong>
+                        </div>
+                        <div className="progress-track">
+                          <span className="progress-fill progress-fill--yellow" style={{ width: `${clampPercent(aprendiz.progresso)}%` }} />
+                        </div>
+                      </div>
+                      <div className="product-row">
+                        <span>Tarefas concluídas</span>
+                        <strong>{aprendiz.tarefas}</strong>
+                      </div>
+                    </article>
                   ))}
                 </div>
               </div>
             )}
-          </div>
+          </section>
         )}
 
         {activeTab === 'mercadolivre' && (
-          <div className="space-y-8">
-            {/* Seção Mercado Livre */}
-            <div className="corporate-card p-8">
-              <h2 className="text-2xl font-bold heading-corporate mb-6">Integração Mercado Livre</h2>
-              
-              {/* Métricas do Mercado Livre */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <div className="metric-card-corporate animate-fade-in-scale">
-                  <div className="flex items-center">
-                    <Package className="h-10 w-10 text-meli-blue" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium subheading-corporate">Produtos Ativos</p>
-                      <p className="text-3xl font-bold text-corporate-dark">{meliData.products.length || 0}</p>
-                    </div>
+          <section className="section-stack" aria-label="Integração Mercado Livre">
+            <div className="kpi-grid">
+              <StatCard icon={ShoppingBag} label="Produtos ativos" value={formatNumber(meliData.products.length)} hint="Amostra sincronizada" tone="blue" />
+              <StatCard icon={TrendingUp} label="Vendas hoje" value={formatNumber(todayMetrics.sales_count)} hint="Pedidos pagos" tone="green" />
+              <StatCard icon={BarChart3} label="Faturamento" value={formatCurrency(todayMetrics.revenue)} hint="Receita do dia" tone="yellow" />
+              <StatCard icon={Clock} label="Pendências" value={formatNumber(todayMetrics.orders_pending)} hint="Pedidos aguardando ação" tone="orange" />
+            </div>
+
+            <div className="meli-grid">
+              <div className="operations-panel">
+                <div className="panel-heading">
+                  <div>
+                    <span className="eyebrow">Ferramentas</span>
+                    <h2>Central Mercado Livre</h2>
                   </div>
                 </div>
-
-                <div className="metric-card-corporate animate-fade-in-scale" style={{animationDelay: '0.1s'}}>
-                  <div className="flex items-center">
-                    <TrendingUp className="h-10 w-10 text-green-500" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium subheading-corporate">Vendas Hoje</p>
-                      <p className="text-3xl font-bold text-corporate-dark">{meliData.metrics.today?.sales_count || 0}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="metric-card-corporate animate-fade-in-scale" style={{animationDelay: '0.2s'}}>
-                  <div className="flex items-center">
-                    <BarChart3 className="h-10 w-10 text-meli-blue" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium subheading-corporate">Faturamento</p>
-                      <p className="text-3xl font-bold text-corporate-dark">
-                        R$ {meliData.metrics.today?.revenue ? (meliData.metrics.today.revenue / 1000).toFixed(1) + 'k' : '0'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="metric-card-corporate animate-fade-in-scale" style={{animationDelay: '0.3s'}}>
-                  <div className="flex items-center">
-                    <Clock className="h-10 w-10 text-orange-500" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium subheading-corporate">Pedidos Pendentes</p>
-                      <p className="text-3xl font-bold text-corporate-dark">{meliData.metrics.today?.orders_pending || 0}</p>
-                    </div>
-                  </div>
+                <div className="feature-grid">
+                  <FeatureCard icon={Package} title="Gestão de produtos" description="Controle preços, status e estoque em uma visão única." variant="primary" />
+                  <FeatureCard icon={FileText} title="Relatórios de vendas" description="Transforme pedidos em indicadores fáceis de acompanhar." variant="success" />
+                  <FeatureCard icon={MessageCircle} title="Atendimento" description="Organize perguntas e mensagens dos compradores." variant="purple" />
+                  <FeatureCard icon={AlertCircle} title="Alertas" description="Identifique estoque baixo e pendências críticas." variant="warning" />
                 </div>
               </div>
 
-              {/* Funcionalidades do Mercado Livre */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="corporate-card p-6">
-                  <div className="flex items-center mb-4">
-                    <Package className="h-8 w-8 text-meli-blue mr-3" />
-                    <h3 className="text-lg font-bold text-corporate-dark">Gestão de Produtos</h3>
+              <aside className="notifications-panel">
+                <div className="panel-heading">
+                  <div>
+                    <span className="eyebrow">Alertas</span>
+                    <h2>Notificações</h2>
                   </div>
-                  <p className="subheading-corporate mb-4">Gerencie seus produtos, preços e estoque diretamente no Mercado Livre.</p>
-                  <button className="btn-corporate-primary w-full">
-                    Acessar Produtos
-                  </button>
+                  <Bell size={20} />
                 </div>
 
-                <div className="corporate-card p-6">
-                  <div className="flex items-center mb-4">
-                    <TrendingUp className="h-8 w-8 text-green-500 mr-3" />
-                    <h3 className="text-lg font-bold text-corporate-dark">Relatórios de Vendas</h3>
+                {meliData.notifications.length ? (
+                  <div className="notification-list">
+                    {meliData.notifications.map((notification) => (
+                      <article key={notification.id} className={`notification-card notification-card--${notification.priority || 'low'}`}>
+                        <span className="notification-dot" />
+                        <div>
+                          <strong>{notification.title}</strong>
+                          <p>{notification.message}</p>
+                        </div>
+                      </article>
+                    ))}
                   </div>
-                  <p className="subheading-corporate mb-4">Acompanhe suas vendas, faturamento e performance em tempo real.</p>
-                  <button className="btn-corporate-secondary w-full">
-                    Ver Relatórios
-                  </button>
-                </div>
+                ) : (
+                  <EmptyState icon={Bell} title="Tudo em dia" description="Nenhuma notificação crítica foi encontrada." />
+                )}
+              </aside>
+            </div>
 
-                <div className="corporate-card p-6">
-                  <div className="flex items-center mb-4">
-                    <Users className="h-8 w-8 text-purple-500 mr-3" />
-                    <h3 className="text-lg font-bold text-corporate-dark">Atendimento</h3>
-                  </div>
-                  <p className="subheading-corporate mb-4">Gerencie perguntas e mensagens dos compradores.</p>
-                  <button className="btn-corporate-primary w-full">
-                    Central de Mensagens
-                  </button>
-                </div>
-
-                <div className="corporate-card p-6">
-                  <div className="flex items-center mb-4">
-                    <BarChart3 className="h-8 w-8 text-blue-500 mr-3" />
-                    <h3 className="text-lg font-bold text-corporate-dark">Analytics</h3>
-                  </div>
-                  <p className="subheading-corporate mb-4">Análise detalhada de performance e métricas de negócio.</p>
-                  <button className="btn-corporate-secondary w-full">
-                    Ver Analytics
-                  </button>
-                </div>
-
-                <div className="corporate-card p-6">
-                  <div className="flex items-center mb-4">
-                    <AlertCircle className="h-8 w-8 text-orange-500 mr-3" />
-                    <h3 className="text-lg font-bold text-corporate-dark">Alertas</h3>
-                  </div>
-                  <p className="subheading-corporate mb-4">Receba notificações sobre estoque baixo, vendas e problemas.</p>
-                  <button className="btn-corporate-primary w-full">
-                    Configurar Alertas
-                  </button>
-                </div>
-
-                <div className="corporate-card p-6">
-                  <div className="flex items-center mb-4">
-                    <FileText className="h-8 w-8 text-indigo-500 mr-3" />
-                    <h3 className="text-lg font-bold text-corporate-dark">Documentação API</h3>
-                  </div>
-                  <p className="subheading-corporate mb-4">Acesse a documentação completa da API do Mercado Livre.</p>
-                  <button className="btn-corporate-secondary w-full">
-                    Ver Documentação
-                  </button>
+            <div className="analytics-panel">
+              <div className="panel-heading">
+                <div>
+                  <span className="eyebrow">Analytics</span>
+                  <h2>Performance dos últimos ciclos</h2>
                 </div>
               </div>
-
-              {/* Status da Integração */}
-              <div className="mt-8 p-6 bg-green-50 border border-green-200 rounded-xl">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-                  <h4 className="text-lg font-bold text-green-800">Status da Integração: Conectado</h4>
+              <div className="insight-grid">
+                <div className="insight-card">
+                  <span>Visitas totais</span>
+                  <strong>{formatNumber(analytics.visits?.total)}</strong>
                 </div>
-                <p className="text-green-700 mt-2">
-                  Sua conta está conectada com sucesso ao Mercado Livre. Última sincronização: há 5 minutos.
-                </p>
+                <div className="insight-card">
+                  <span>Visitantes únicos</span>
+                  <strong>{formatNumber(analytics.visits?.unique)}</strong>
+                </div>
+                <div className="insight-card">
+                  <span>Conversão</span>
+                  <strong>{Number(analytics.visits?.conversion_rate || 0).toFixed(1)}%</strong>
+                </div>
+              </div>
+              <div className="integration-status">
+                <CheckCircle2 size={18} />
+                <div>
+                  <strong>Status da integração: conectado</strong>
+                  <p>Dados simulados carregados com fallback seguro quando algum endpoint falha.</p>
+                </div>
               </div>
             </div>
-          </div>
+          </section>
         )}
-      </div>
+      </main>
 
-      {/* Footer com texto do projeto */}
-      <div className="fixed bottom-4 left-4">
-
-        <div className="text-xs text-white bg-black bg-opacity-50 px-3 py-2 rounded-lg">
-          Dashboard Empresarial - Mercado Livre
-        </div>
-      </div>
+      <footer className="app-footer">
+        Dashboard Empresarial Mercado Livre · atualizado para uma experiência mais fluida
+      </footer>
     </div>
   );
 }
@@ -801,4 +862,3 @@ function App() {
 }
 
 export default App;
-
